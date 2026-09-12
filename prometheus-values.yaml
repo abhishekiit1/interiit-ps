@@ -1,0 +1,31 @@
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'pod']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'agent-webhook'
+    receivers:
+    - name: 'agent-webhook'
+      webhook_configs:
+      # host.docker.internal allows the K8s cluster to reach your MacBook's localhost
+      - url: 'http://host.docker.internal:8080/alert'
+        send_resolved: true
+
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: agent_triggers
+        rules:
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is repeatedly restarting."
