@@ -1,0 +1,20 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: frontend-adservice-disconnect
+  namespace: default
+spec:
+  action: loss
+  mode: all
+  selector:
+    labelSelectors:
+      app: frontend
+  loss:
+    loss: '100'
+  direction: to
+  target:
+    selector:
+      labelSelectors:
+        app: adservice
+    mode: all
+  duration: '5m'
