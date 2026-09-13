@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: checkout-memory-leak
+  namespace: default
+spec:
+  mode: one
+  selector:
+    labelSelectors:
+      app: checkoutservice
+  stressors:
+    memory:
+      workers: 4
+      size: '1GB'
+  duration: '5m'
