@@ -1,5 +1,6 @@
 # agent/core/state.py
-from typing import TypedDict, List, Annotated
+from typing import TypedDict, List, Annotated, Sequence, Union
+from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
 import operator
 
 class InvestigationState(TypedDict):
@@ -13,16 +14,16 @@ class InvestigationState(TypedDict):
     incident_description: str
     
     # A running log of what tools have been executed to prevent infinite loops
-    investigation_steps: Annotated[List[str], operator.add]
+    investigation_steps: Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
     
     # Plausible explanations the Lead Investigator is currently testing
-    hypotheses: Annotated[List[str], operator.add]
+    hypotheses: Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
     
     # Concrete observations returned by your Python tools
-    evidence: Annotated[List[str], operator.add]
+    evidence:  Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
     
     # The final RCA string containing the root cause, confidence, and alternative explanations
     final_rca: str
     
     # A routing flag to tell LangGraph which node should execute next
-    next_node: str
+    next_node: int
