@@ -27,3 +27,6 @@ class InvestigationState(TypedDict):
     
     # A routing flag to tell LangGraph which node should execute next
     next_node: int
+
+    # How confident the agent is about the hypotheses
+    confidence: float
