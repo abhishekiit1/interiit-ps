@@ -30,3 +30,6 @@ class InvestigationState(TypedDict):
 
     # How confident the agent is about the hypotheses
     confidence: float
+
+    # Human-readable confidence label for the final RCA
+    confidence_level: str

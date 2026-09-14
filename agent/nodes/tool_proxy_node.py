@@ -4,6 +4,7 @@ from langchain_core.prompts import load_prompt
 from core.llm_init import llm
 from yaml import safe_loads
 
-
+# the routing above it decides which tool to use it simply serves as proxy node for tools
+# because adding one conditional edge to another was not possible
 def tool_proxy(state: InvestigationState) -> InvestigationState:
     return state
