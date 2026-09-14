@@ -54,12 +54,15 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
     short summary of logs as evidence for the supervisor to look at
     """
     try:
-        prompt = [SystemMessage(load_prompt("../prompts/Prometheus_Query.yaml"))]
-        response = llm.invoke(
-            prompt.format(alert=state["incident_description"])
+        prompt_template = load_prompt("../prompts/Prometheus_Query.yaml")
+        formatted_prompt = prompt_template.format(
+            incident_description=state.get("incident_description", ""),
+            hypotheses=state.get("hypotheses", []),
+            evidence=state.get("evidence", [])
         )
-        yaml_response = safe_load(response.content)
-        promql_query = response.content.strip()
+        response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
+        promql_query = yaml_response.get("promql_query", "").strip()
         last_error = None
 
         for attempt in range(1, 4):
@@ -68,12 +71,6 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
 
                 if result.startswith("Prometheus query failed:"):
                     raise RuntimeError(result)
-
-            
-                response = llm.invoke(
-                    prompt.format()
-                )
-                yaml_response = safe_load(response.content)
 
                 state["evidence"] = [*state.get("evidence", []), result]
                 return state

@@ -1,11 +1,21 @@
 _type: prompt
 input_variables:
+    - incident_description
+    - incident_timestamp
+    - suspect_components
     - evidence
     - hypotheses
 template: |
     You are the iterative investigator for a Kubernetes production incident.
     You must update the current hypothesis set using only the evidence already gathered.
     Do not rely on assumptions, prior intuition, or generic Kubernetes knowledge unless it is directly supported by the evidence.
+
+    Incident:
+    {incident_description}
+    Timestamp: {incident_timestamp}
+
+    Isolated Suspects:
+    {suspect_components}
 
     Existing hypotheses under test:
     {hypotheses}
@@ -18,15 +28,18 @@ template: |
     2. Update the hypothesis list using only facts supported by that evidence.
     3. Do not invent events, logs, metrics, pod states, timestamps, or service behavior that are not present in the evidence.
     4. If the evidence is insufficient to support a new hypothesis, keep the list narrow and grounded in the available data.
-    5. If a new tool is required to resolve remaining uncertainty, return the corresponding tool bitmask as a base-10 integer.
-    6. If no new tool is required, return 0.
-    7. Return a confidence score between 0 and 1, where 1.0 means the current evidence strongly supports the leading hypothesis and 0.0 means the evidence does not support it.
-    8. Keep the response machine-readable and compact.
+    5. Investigate hierarchically: First identify failing deployments or services. Once identified, use the Kubernetes tool to drill down into specific replicas.
+    6. If a specific tool (e.g., Prometheus) returns a syntax error or fails to find data twice, DO NOT call it again. Move on to another tool.
+    7. If a new tool is required to resolve remaining uncertainty, return the corresponding tool bitmask as a base-10 integer.
+    8. If no new tool is required, return 0.
+    9. Return a confidence score between 0 and 1, where 1.0 means the current evidence strongly supports the leading hypothesis and 0.0 means the evidence does not support it.
+    10. Keep the response machine-readable and compact.
 
     Rules:
     - Do not add markdown fences.
     - Do not add commentary outside the three fields above.
-    - Only output hypotheses, next_step, and confidence.
+    - Only output suspect_components, hypotheses, next_step, and confidence.
+    - Update `suspect_components` as a list of strings representing the current failing deployments or components under suspicion (e.g., ["checkoutservice"]).
 
     Tool bitmask rules:
     - 0001 => query_prometheus
@@ -38,6 +51,9 @@ template: |
     - If a tool is required, the value must be a valid integer matching the allowed bitmask values.
     
     Return exactly this structure with no extra sections:
+
+    suspect_components:
+    - checkoutservice
 
     hypotheses:
     - Updated hypothesis 1

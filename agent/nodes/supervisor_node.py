@@ -12,11 +12,20 @@ def initial_investigation(state: InvestigationState) -> InvestigationState:
     we need to call a suitable tool or tools as per our requirement. 
     """
     try:
-        initial_prompt = [SystemMessage(load_prompt("../prompts/Investigation_Begin.yaml"))]
-        initial_response = llm.invoke(initial_prompt.format(alert= state["incident_description"]))
-        yaml_response = safe_load(initial_response.content)
-        state["hypotheses"] = yaml_response["hypotheses"]
-        state["next_node"] = int(yaml_response["next_step"])
+        prompt_template = load_prompt("../prompts/Investigation_Begin.yaml")
+        # In a real system, incident_timestamp would be parsed from the alert. 
+        # For our swarm, we'll initialize it here if it's empty.
+        import datetime
+        if not state.get("incident_timestamp"):
+            state["incident_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            
+        formatted_prompt = prompt_template.format(alert=state.get("incident_description", ""))
+        initial_response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        
+        yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
+        state["hypotheses"] = yaml_response.get("hypotheses", [])
+        state["next_node"] = int(yaml_response.get("next_step", 0))
+        state["suspect_components"] = [] # Initialize empty for the first step
         return state
     except Exception as error:
         raise RuntimeError(
@@ -31,15 +40,21 @@ def iterative_investigation(state: InvestigationState) -> InvestigationState:
     the solution.
     """
     try:
-        initial_prompt = [SystemMessage(load_prompt("../prompts/Iterative_Investigation.yaml"))]
-        initail_response = llm.invoke(
-            initial_prompt.format(hypotheses=state["hypotheses"],
-            evidence=state["evidence"])
+        prompt_template = load_prompt("../prompts/Iterative_Investigation.yaml")
+        formatted_prompt = prompt_template.format(
+            incident_description=state.get("incident_description", ""),
+            incident_timestamp=state.get("incident_timestamp", ""),
+            suspect_components=state.get("suspect_components", []),
+            hypotheses=state.get("hypotheses", []),
+            evidence=state.get("evidence", [])
         )
-        yaml_response = safe_load(initail_response)
-        state["hypotheses"] = yaml_response["hypotheses"]
-        state["next_node"] = int(yaml_response["next_step"])
-        state["confidence"] = float(yaml_response["confidence"])
+        initial_response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        
+        yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
+        state["suspect_components"] = yaml_response.get("suspect_components", state.get("suspect_components", []))
+        state["hypotheses"] = yaml_response.get("hypotheses", [])
+        state["next_node"] = int(yaml_response.get("next_step", 0))
+        state["confidence"] = float(yaml_response.get("confidence", 0.0))
         return state
     except Exception as error:
         raise RuntimeError(

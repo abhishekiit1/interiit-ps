@@ -13,6 +13,12 @@ class InvestigationState(TypedDict):
     # The initial incident trigger (e.g., "The checkout service is experiencing 5xx errors")
     incident_description: str
     
+    # The timestamp when the incident was detected, used to anchor time queries in Prometheus and Loki
+    incident_timestamp: str
+
+    # High-level isolated suspects (e.g. deployments or services) to drill down into
+    suspect_components: list[str]
+    
     # A running log of what tools have been executed to prevent infinite loops
     investigation_steps: Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
     

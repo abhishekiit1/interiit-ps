@@ -36,11 +36,15 @@ def query_prometheus(promql_query: str) -> str:
         
         # 3. Format into a clean, LLM-friendly string to protect context limits
         formatted_output = ""
-        for res in results:
+        # Truncate to maximum 15 series to avoid context overflow
+        for res in results[:15]:
             metric_labels = res.get('metric', {})
             # Get the most recent value [timestamp, "value"]
             value = res.get('value', [None, "Unknown"])[1] 
             formatted_output += f"Labels: {metric_labels} | Value: {value}\n"
+            
+        if len(results) > 15:
+            formatted_output += f"... (Truncated {len(results) - 15} more series) ...\n"
             
         return f"<untrusted_data>\n{formatted_output}\n</untrusted_data>"
         
@@ -55,16 +59,21 @@ config.load_kube_config()
 v1 = client.CoreV1Api()
 
 @tool
-def get_pod_status(namespace: str = "default") -> str:
+def get_pod_status(namespace: str = "default", app_label: str = "") -> str:
     """
-    Fetches the current status and restart counts of all Kubernetes pods.
+    Fetches the current status and restart counts of Kubernetes pods.
     Use this tool to investigate if containers are crash-looping or failing to start.
     
     Args:
         namespace: The Kubernetes namespace to query (usually "default").
+        app_label: Optional label to filter pods by app (e.g., "checkoutservice"). Use for hierarchical drill-downs.
     """
     try:
-        pods = v1.list_namespaced_pod(namespace=namespace)
+        if app_label:
+            pods = v1.list_namespaced_pod(namespace=namespace, label_selector=f"app={app_label}")
+        else:
+            pods = v1.list_namespaced_pod(namespace=namespace)
+            
         formatted_output = ""
         
         for pod in pods.items:
@@ -153,6 +162,9 @@ def query_loki_logs(logql_query: str, limit: int = 50) -> str:
             values = res.get('values', [])
             for val in values:
                 log_line = val[1].strip()
+                # Truncate extremely long single log lines to avoid context blowup
+                if len(log_line) > 500:
+                    log_line = log_line[:500] + "... (truncated)"
                 formatted_output += f"{log_line}\n"
                 
         # Mandatory sandboxing: Treat all application logs as untrusted input
