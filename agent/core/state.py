@@ -20,13 +20,13 @@ class InvestigationState(TypedDict):
     suspect_components: list[str]
     
     # A running log of what tools have been executed to prevent infinite loops
-    investigation_steps: Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
+    investigation_steps: list[str]
     
     # Plausible explanations the Lead Investigator is currently testing
-    hypotheses: Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
+    hypotheses: list[str]
     
     # Concrete observations returned by your Python tools
-    evidence:  Annotated[Sequence[Union[AIMessage, SystemMessage, ToolMessage]], operator.add]
+    evidence: list[str]
     
     # The final RCA string containing the root cause, confidence, and alternative explanations
     final_rca: str
@@ -39,3 +39,6 @@ class InvestigationState(TypedDict):
 
     # Human-readable confidence label for the final RCA
     confidence_level: str
+    
+    # Dedicated counter to prevent infinite loops
+    iteration_count: int

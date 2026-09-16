@@ -1,8 +1,8 @@
+import os
 import requests
 import time
 from langchain_core.tools import tool
 from core.state import InvestigationState
-from core.tools import query_prometheus
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import load_prompt
 from core.llm_init import llm
@@ -35,16 +35,20 @@ def query_prometheus(promql_query: str) -> str:
         
         # 3. Format into a clean, LLM-friendly string to protect context limits
         formatted_output = ""
-        for res in results:
+        # Truncate to maximum 15 series to avoid context overflow
+        for res in results[:15]:
             metric_labels = res.get('metric', {})
             # Get the most recent value [timestamp, "value"]
             value = res.get('value', [None, "Unknown"])[1] 
             formatted_output += f"Labels: {metric_labels} | Value: {value}\n"
             
+        if len(results) > 15:
+            formatted_output += f"... (Truncated {len(results) - 15} more series) ...\n"
+            
         return f"<untrusted_data>\n{formatted_output}\n</untrusted_data>"
         
-    except Exception as error:
-        return f"Prometheus query failed: {str(error)}"
+    except Exception as e:
+        return f"Prometheus query failed: {str(e)}"
 
 def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
     """
@@ -54,9 +58,11 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
     short summary of logs as evidence for the supervisor to look at
     """
     try:
-        prompt_template = load_prompt("../prompts/Prometheus_Query.yaml")
+        prompt_template = load_prompt(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../prompts/Prometheus_Query.yaml"))
         formatted_prompt = prompt_template.format(
             incident_description=state.get("incident_description", ""),
+            incident_timestamp=state.get("incident_timestamp", ""),
+            suspect_components=state.get("suspect_components", []),
             hypotheses=state.get("hypotheses", []),
             evidence=state.get("evidence", [])
         )
