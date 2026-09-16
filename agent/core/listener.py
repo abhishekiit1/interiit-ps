@@ -11,21 +11,32 @@ from state import InvestigationState
 
 app = FastAPI()
 
+import threading
+
+# Lock to prevent concurrent RCA agents from exhausting the LLM quota
+rca_lock = threading.Lock()
+
 def run_investigation(incident_description: str):
     """
     Background task to run the LangGraph agent without blocking the FastAPI response.
     """
+    # Prevent concurrent agents to save LLM rate limits
+    if not rca_lock.acquire(blocking=False):
+        print(f"\n⚠️ RCA Agent already running! Skipping alert to protect API quota: {incident_description[:50]}...")
+        return
+        
+
     print("\n" + "="*50)
     print("🤖 SPAWNING LANGGRAPH RCA AGENT 🤖")
     print("="*50)
     
     initial_state = InvestigationState(
-        incident_description=incident_description,
-        hypotheses=[],
-        evidence=[],
-        suspect_components=[],
-        next_node=0,
-        iteration_count=0
+    incident_description=incident_description,
+    hypotheses=[],
+    evidence=[],
+    suspect_components=[],
+    next_node=0,
+    iteration_count=0
     )
     
     try:
@@ -48,6 +59,8 @@ def run_investigation(incident_description: str):
             
     except Exception as e:
         print(f"\n❌ AGENT EXECUTION FAILED: {str(e)}\n")
+    finally:
+        rca_lock.release()
 
 @app.post("/alert")
 async def receive_alert(request: Request, background_tasks: BackgroundTasks):
