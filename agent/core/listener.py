@@ -52,6 +52,7 @@ def run_investigation(incident_description: str):
 @app.post("/alert")
 async def receive_alert(request: Request, background_tasks: BackgroundTasks):
     payload = await request.json()
+    print(payload)
     print("\n🚨 INCOMING ALERT DETECTED 🚨")
     
     alerts = payload.get("alerts", [])
@@ -79,4 +80,4 @@ async def receive_alert(request: Request, background_tasks: BackgroundTasks):
 
 if __name__ == "__main__":
     print("Starting Agent Listener on port 8080...")
-    uvicorn.run(app, host="localhost", port=7000)
+    uvicorn.run(app, host="0.0.0.0", port=3000)

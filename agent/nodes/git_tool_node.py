@@ -58,7 +58,7 @@ def git_tool_function(state: InvestigationState) -> InvestigationState:
             evidence=state.get("evidence", [])
         )
         
-        response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        response = llm.invoke([HumanMessage(content=formatted_prompt)])
         yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
         run_git_tool = yaml_response.get("run_git_tool", False)
         

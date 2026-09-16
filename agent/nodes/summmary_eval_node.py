@@ -16,7 +16,7 @@ def summary_eval_function(state: InvestigationState) -> InvestigationState:
             hypotheses=state.get("hypotheses", []),
             confidence=state.get("confidence", 0.0),
         )
-        response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        response = llm.invoke([HumanMessage(content=formatted_prompt)])
         yaml_response = safe_load(response.content)
         state["final_rca"] = yaml_response["final_rca"]
         state["confidence"] = float(yaml_response["confidence"])

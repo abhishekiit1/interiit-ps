@@ -62,7 +62,7 @@ def k8s_tool_function(state: InvestigationState) -> InvestigationState:
             evidence=state.get("evidence", [])
         )
         
-        response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        response = llm.invoke([HumanMessage(content=formatted_prompt)])
         yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
         app_label = yaml_response.get("app_label", "").strip()
         last_error = None

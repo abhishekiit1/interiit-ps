@@ -1,6 +1,6 @@
 import os
 from core.state import InvestigationState
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import load_prompt
 from core.llm_init import llm
 from yaml import safe_load
@@ -21,7 +21,7 @@ def initial_investigation(state: InvestigationState) -> InvestigationState:
             state["incident_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             
         formatted_prompt = prompt_template.format(alert=state.get("incident_description", ""))
-        initial_response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
         
         yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
         state["hypotheses"] = yaml_response.get("hypotheses", [])
@@ -56,7 +56,7 @@ def iterative_investigation(state: InvestigationState) -> InvestigationState:
             hypotheses=state.get("hypotheses", []),
             evidence=state.get("evidence", [])
         )
-        initial_response = llm.invoke([SystemMessage(content=formatted_prompt)])
+        initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
         
         yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
         state["suspect_components"] = yaml_response.get("suspect_components", state.get("suspect_components", []))
