@@ -65,7 +65,6 @@ def run_investigation(incident_description: str):
 @app.post("/alert")
 async def receive_alert(request: Request, background_tasks: BackgroundTasks):
     payload = await request.json()
-    print(payload)
     print("\n🚨 INCOMING ALERT DETECTED 🚨")
     
     alerts = payload.get("alerts", [])

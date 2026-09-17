@@ -17,7 +17,9 @@ def summary_eval_function(state: InvestigationState) -> InvestigationState:
             confidence=state.get("confidence", 0.0),
         )
         response = llm.invoke([HumanMessage(content=formatted_prompt)])
-        yaml_response = safe_load(response.content)
+        # Strip markdown fences before parsing YAML to prevent PyYAML crash
+        clean_yaml = response.content.replace('```yaml', '').replace('```', '')
+        yaml_response = safe_load(clean_yaml)
         state["final_rca"] = yaml_response["final_rca"]
         state["confidence"] = float(yaml_response["confidence"])
         state["confidence_level"] = yaml_response["confidence_level"]

@@ -23,9 +23,24 @@ def initial_investigation(state: InvestigationState) -> InvestigationState:
         formatted_prompt = prompt_template.format(alert=state.get("incident_description", ""))
         initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
         
-        yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
+        raw_content = initial_response.content.replace('```yaml', '').replace('```', '')
+        try:
+            yaml_response = safe_load(raw_content)
+        except Exception:
+            import re
+            yaml_response = {}
+            ns_match = re.search(r'next_step:.*?(\d+)', raw_content, re.DOTALL)
+            yaml_response["next_step"] = int(ns_match.group(1)) if ns_match else 0
+            yaml_response["hypotheses"] = []
+            
         state["hypotheses"] = yaml_response.get("hypotheses", [])
-        state["next_node"] = int(yaml_response.get("next_step", 0))
+        
+        # Handle next_step being returned as a list (e.g., [1] instead of 1)
+        ns = yaml_response.get("next_step", 0)
+        if isinstance(ns, list):
+            ns = ns[0] if len(ns) > 0 else 0
+        state["next_node"] = int(ns)
+        
         state["suspect_components"] = [] # Initialize empty for the first step
         return state
     except Exception as error:
@@ -58,11 +73,32 @@ def iterative_investigation(state: InvestigationState) -> InvestigationState:
         )
         initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
         
-        yaml_response = safe_load(initial_response.content.replace('```yaml', '').replace('```', ''))
+        raw_content = initial_response.content.replace('```yaml', '').replace('```', '')
+        try:
+            yaml_response = safe_load(raw_content)
+        except Exception:
+            import re
+            yaml_response = {}
+            ns_match = re.search(r'next_step:.*?(\d+)', raw_content, re.DOTALL)
+            yaml_response["next_step"] = int(ns_match.group(1)) if ns_match else 0
+            conf_match = re.search(r'confidence:.*?([\d.]+)', raw_content, re.DOTALL)
+            yaml_response["confidence"] = float(conf_match.group(1)) if conf_match else 0.0
+            yaml_response["suspect_components"] = state.get("suspect_components", [])
+            yaml_response["hypotheses"] = []
+
         state["suspect_components"] = yaml_response.get("suspect_components", state.get("suspect_components", []))
         state["hypotheses"] = yaml_response.get("hypotheses", [])
-        state["next_node"] = int(yaml_response.get("next_step", 0))
-        state["confidence"] = float(yaml_response.get("confidence", 0.0))
+        
+        ns = yaml_response.get("next_step", 0)
+        if isinstance(ns, list):
+            ns = ns[0] if len(ns) > 0 else 0
+        state["next_node"] = int(ns)
+        
+        conf = yaml_response.get("confidence", 0.0)
+        if isinstance(conf, list):
+            conf = conf[0] if len(conf) > 0 else 0.0
+        state["confidence"] = float(conf)
+
         return state
     except Exception as error:
         raise RuntimeError(

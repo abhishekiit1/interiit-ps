@@ -32,8 +32,16 @@ def supervisor_routing(state: InvestigationState) -> str:
 
 def tool_routing(state: InvestigationState) -> int:
     next_node = state.get("next_node", 0)
-    if next_node in [1, 2, 4, 8]:
-        return next_node
+    # If multiple bits are set (e.g. 3), pick the lowest set bit to run first.
+    # The iterative loop will call the next tool in subsequent iterations.
+    if next_node & 1:
+        return 1
+    if next_node & 2:
+        return 2
+    if next_node & 4:
+        return 4
+    if next_node & 8:
+        return 8
     return 0
 
 

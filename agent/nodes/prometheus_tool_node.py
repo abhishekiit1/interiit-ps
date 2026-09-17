@@ -23,7 +23,7 @@ def query_prometheus(promql_query: str) -> str:
     """
     try:
         # 1. Fire the GET request to the native API
-        response = requests.get(PROMETHEUS_URL, params={'query': promql_query})
+        response = requests.get(PROMETHEUS_URL, params={'query': promql_query}, timeout=10)
         response.raise_for_status()
         data = response.json()
         

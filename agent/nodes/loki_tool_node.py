@@ -23,7 +23,7 @@ def query_loki_logs(logql_query: str, limit: int = 50) -> str:
         limit: Maximum number of log lines to return (default 50 to prevent context overflow).
     """
     try:
-        response = requests.get(LOKI_URL, params={'query': logql_query, 'limit': limit})
+        response = requests.get(LOKI_URL, params={'query': logql_query, 'limit': limit}, timeout=10)
         response.raise_for_status()
         data = response.json()
         
