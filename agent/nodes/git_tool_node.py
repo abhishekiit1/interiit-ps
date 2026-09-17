@@ -1,5 +1,5 @@
 import time
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import load_prompt
 from core.llm_init import llm
 from core.state import InvestigationState

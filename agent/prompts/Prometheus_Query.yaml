@@ -25,7 +25,7 @@ template: |
   Instructions:
   1. Analyze the incident, suspects, and hypotheses.
   2. Write exactly ONE valid PromQL query.
-  3. Keep the query simple and focused. Use the `suspect_components` array to restrict your query using `app` or `deployment` labels (e.g., rate(http_requests_total{app=~"checkoutservice"}[5m])).
+  3. Keep the query simple and focused. Use the `suspect_components` array to restrict your query using `app` or `deployment` labels (e.g., rate(http_requests_total{{app=~"checkoutservice"}}[5m])).
   4. Ensure your query logic accounts for the `incident_timestamp` to fetch data from the correct time window.
   5. Return EXACTLY the following YAML structure and no extra text or markdown formatting.
   
