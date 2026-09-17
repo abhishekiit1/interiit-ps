@@ -50,7 +50,7 @@ serverFiles:
               description: "App {{ $labels.app }} 99th percentile latency is above 2 seconds."
 
           - alert: HighMemoryUsage
-            expr: container_memory_working_set_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""} * 100 > 90
+            expr: (container_memory_working_set_bytes{container!="", namespace="default"} / container_spec_memory_limit_bytes{container!="", namespace="default"} * 100 > 90) and container_spec_memory_limit_bytes{container!="", namespace="default"} > 0
             for: 1m
             labels:
               severity: warning

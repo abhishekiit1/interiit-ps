@@ -57,9 +57,9 @@ def iterative_investigation(state: InvestigationState) -> InvestigationState:
     """
     # Safeguard against infinite loops
     state["iteration_count"] = state.get("iteration_count", 0) + 1
-    if state["iteration_count"] >= 6:
+    if state["iteration_count"] >= 4:
         state["next_node"] = 0
-        state["evidence"] = [*state.get("evidence", []), "SYSTEM_NOTE: Max iterations reached (6). Forcing termination due to infinite loop safeguard."]
+        state["evidence"] = [*state.get("evidence", []), "SYSTEM_NOTE: Max iterations reached (4). Forcing summary generation."]
         return state
 
     try:

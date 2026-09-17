@@ -67,6 +67,12 @@ async def receive_alert(request: Request, background_tasks: BackgroundTasks):
     payload = await request.json()
     print("\n🚨 INCOMING ALERT DETECTED 🚨")
     
+    # Known infrastructure/system components to ignore — these are NOT application pods
+    IGNORED_PREFIXES = (
+        "kindnet", "kube-proxy", "kube-scheduler", "kube-controller",
+        "kube-apiserver", "etcd", "coredns", "prometheus-", "loki",
+    )
+    
     alerts = payload.get("alerts", [])
     for alert in alerts:
         status = alert.get("status")
@@ -77,7 +83,23 @@ async def receive_alert(request: Request, background_tasks: BackgroundTasks):
             
         pod_name = alert.get("labels", {}).get("pod", "Unknown Pod")
         alert_name = alert.get("labels", {}).get("alertname", "Unknown Alert")
+        namespace = alert.get("labels", {}).get("namespace", "")
         description = alert.get("annotations", {}).get("description", "No description")
+        
+        # FILTER 1: Skip alerts from non-default namespaces (kube-system, monitoring, etc.)
+        if namespace and namespace != "default":
+            print(f"⏭️ Skipping alert for pod '{pod_name}' in namespace '{namespace}' (not default)")
+            continue
+            
+        # FILTER 2: Skip known infrastructure/system pods even if namespace is missing
+        if any(pod_name.startswith(prefix) for prefix in IGNORED_PREFIXES):
+            print(f"⏭️ Skipping infrastructure pod alert: {pod_name}")
+            continue
+        
+        # FILTER 3: Skip +Inf values which are bogus (division by zero from missing resource limits)
+        if "+Inf" in description:
+            print(f"⏭️ Skipping bogus +Inf alert for pod '{pod_name}' (no resource limits set)")
+            continue
         
         print(f"Status: {status}\nAlert: {alert_name}\nTarget Pod: {pod_name}\nDetails: {description}")
         print("-" * 40)
