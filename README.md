@@ -10,7 +10,7 @@ This repository is built on top of the Google Cloud Online Boutique microservice
 
 Our agent operates on a multi-agent swarm architecture using LangGraph, allowing for dynamic, iterative investigation of cluster alerts.
 
-![Architecture Diagram](/images/graph_architecture.png)
+![Architecture Diagram](images/graph_architecture.png)
 
 ### Core Components:
 - **Supervisor Node**: The "Brain" of the operation. It receives the initial Prometheus alert, formulates hypotheses, and decides which specialized tool to call next using a bitmask (e.g., `0101` to call both Loki and Prometheus).
@@ -101,7 +101,7 @@ We successfully stress-tested the agent pipeline. We were able to generate 2 RCA
 
 When successful, the agent accurately identifies the failing pod (e.g., `cartservice` OOMKilled) and returns a structured YAML RCA report detailing the root cause and confidence level.
 
-![RCA Screenshot](/images/rca_scrnsht.png)
+![RCA Screenshot](images/rca_scrnsht.png)
 
 ---
 
