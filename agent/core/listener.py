@@ -55,10 +55,30 @@ def run_investigation(incident_description: str):
         print("🚀 ROOT CAUSE ANALYSIS REPORT 🚀")
         print("="*50)
         import yaml
-        print(yaml.dump(final_state.get("final_rca", {}), sort_keys=False))
+        import os
+        import datetime
+        
+        rca_content = yaml.dump(final_state.get("final_rca", {}), sort_keys=False)
+        print(rca_content)
+        
+        # Save RCA to a text file
+        reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../rca_reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"rca_report_{timestamp_str}.txt"
+        filepath = os.path.abspath(os.path.join(reports_dir, filename))
+        
+        with open(filepath, "w") as f:
+            f.write(rca_content)
+            
+        print(f"\n📄 RCA successfully saved to: {filepath}")
             
     except Exception as e:
-        print(f"\n❌ AGENT EXECUTION FAILED: {str(e)}\n")
+        import traceback
+        print(f"\n❌ AGENT EXECUTION FAILED: {str(e)}")
+        traceback.print_exc()
+        print()
     finally:
         rca_lock.release()
 

@@ -67,8 +67,21 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
             evidence=state.get("evidence", [])
         )
         response = llm.invoke([HumanMessage(content=formatted_prompt)])
-        yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
+        raw_content = response.content.replace('```yaml', '').replace('```', '').strip()
+        
+        try:
+            yaml_response = safe_load(raw_content)
+            if not isinstance(yaml_response, dict):
+                raise ValueError("Parsed YAML is not a dictionary")
+        except Exception:
+            # Fallback: try to extract promql_query from raw text
+            import re
+            match = re.search(r'promql_query:\s*["\']?(.+?)["\']?\s*$', raw_content, re.MULTILINE)
+            yaml_response = {"promql_query": match.group(1) if match else "up"}
+            
         promql_query = yaml_response.get("promql_query", "").strip()
+        print(f"    📈 Prometheus query: {promql_query[:100]}")
+        
         last_error = None
 
         for attempt in range(1, 4):
@@ -78,6 +91,7 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
                 if result.startswith("Prometheus query failed:"):
                     raise RuntimeError(result)
 
+                print(f"    📈 Prometheus result: {result[:150]}...")
                 state["evidence"] = [*state.get("evidence", []), result]
                 return state
             except Exception as error:
@@ -87,4 +101,8 @@ def prometheus_tool_function(state: InvestigationState) -> InvestigationState:
             f"Prometheus query failed after 3 attempts: {last_error}"
         )
     except Exception as error:
-        raise RuntimeError(f"Prometheus Tool Error:\nReason: {error}") from error
+        # Gracefully handle failures — don't crash the pipeline
+        error_msg = f"Prometheus Tool: Query failed ({error}). Returning empty evidence."
+        print(f"    ⚠️ {error_msg}")
+        state["evidence"] = [*state.get("evidence", []), f"<untrusted_data>\n{error_msg}\n</untrusted_data>"]
+        return state

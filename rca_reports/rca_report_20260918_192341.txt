@@ -1,0 +1,42 @@
+summary: Cartservice pod cartservice-5766c97c79-rr8xb experienced heavy CPU throttling
+  and repeated terminations with exit code 137.
+impact: Pod cartservice-5766c97c79-rr8xb restarted 21 times, leading to cartservice
+  instability.
+root_cause: Cartservice pod cartservice-5766c97c79-rr8xb is being heavily CPU throttled
+  under cgroup limits and crashing repeatedly with exit code 137.
+causal_chain:
+- 'Cartservice container experienced heavy CPU throttling under cgroup constraints
+  [Alert Triggered: CPUThrottling].'
+- 'Severe throttling or resource constraints led to container termination with exit
+  code 137 [Restarts: 21 | LastTermination: Error (exit_code=137)].'
+- 'The pod continuously restarted, accumulating 21 total restarts [Restarts: 21].'
+supporting_evidence:
+- CPUThrottling alert triggered for target cartservice-5766c97c79-rr8xb.
+- cAdvisor metric showing container server in kubelet-kubepods-burstable.slice for
+  pod cartservice-5766c97c79-rr8xb with Value 0.09243285416666666.
+- 'Pod list showing cartservice-5766c97c79-rr8xb in Phase Running with Restarts: 21
+  and LastTermination: Error (exit_code=137).'
+contributing_factors:
+- Restrictive CPU limits on cartservice cgroup.
+- Failure of Prometheus and Loki tool queries due to API token limit errors, preventing
+  deep telemetry inspection.
+alternatives_considered:
+- hypothesis: The configured CPU limit on cartservice is causing severe CPU throttling,
+    leading to process starvation, liveness probe timeouts, or container termination
+    with exit code 137.
+  assessment: Plausible and strongly indicated by CPUThrottling alert and cAdvisor
+    metric, but probe timeout mechanisms cannot be confirmed without container logs.
+- hypothesis: High resource consumption or recent configuration changes in cartservice
+    are exceeding cgroup CPU and memory constraints.
+  assessment: CPU constraint violation is confirmed, but memory limits and specific
+    configuration change impacts remain unverified due to missing log data.
+corrective_actions:
+- Increase CPU resource requests and limits for cartservice in Kubernetes deployment
+  specifications.
+- Inspect memory usage trends once Prometheus metrics are available to ensure exit
+  code 137 was not an OOM kill.
+- Resolve OpenRouter API token quota limits to ensure Loki and Prometheus diagnostics
+  function during incidents.
+unknowns:
+- Whether exit code 137 was triggered by OOMKilled or probe starvation, as Loki log
+  queries failed.

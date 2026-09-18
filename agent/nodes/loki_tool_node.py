@@ -64,8 +64,21 @@ def loki_tool_function(state: InvestigationState) -> InvestigationState:
         )
         
         response = llm.invoke([HumanMessage(content=formatted_prompt)])
-        yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
+        raw_content = response.content.replace('```yaml', '').replace('```', '').strip()
+        
+        try:
+            yaml_response = safe_load(raw_content)
+            if not isinstance(yaml_response, dict):
+                raise ValueError("Parsed YAML is not a dictionary")
+        except Exception:
+            # Fallback: try to extract logql_query from raw text
+            import re
+            match = re.search(r'logql_query:\s*["\']?(.+?)["\']?\s*$', raw_content, re.MULTILINE)
+            yaml_response = {"logql_query": match.group(1) if match else '{namespace="default"}'}
+        
         logql_query = yaml_response.get("logql_query", "").strip()
+        print(f"    📝 Loki query: {logql_query[:100]}")
+        
         last_error = None
 
         for attempt in range(1, 4):
@@ -76,6 +89,7 @@ def loki_tool_function(state: InvestigationState) -> InvestigationState:
                 if result.startswith("Loki query failed:"):
                     raise RuntimeError(result)
 
+                print(f"    📝 Loki result: {result[:150]}...")
                 # Append the tool's raw result directly to the evidence list
                 state["evidence"] = [*state.get("evidence", []), result]
                 return state
@@ -84,4 +98,8 @@ def loki_tool_function(state: InvestigationState) -> InvestigationState:
         
         raise RuntimeError(f"Loki query failed after 3 attempts: {last_error}")
     except Exception as error:
-        raise RuntimeError(f"Loki Tool Error:\nReason: {error}") from error
+        # Gracefully handle failures — don't crash the pipeline
+        error_msg = f"Loki Tool: Query failed ({error}). Returning empty evidence."
+        print(f"    ⚠️ {error_msg}")
+        state["evidence"] = [*state.get("evidence", []), f"<untrusted_data>\n{error_msg}\n</untrusted_data>"]
+        return state

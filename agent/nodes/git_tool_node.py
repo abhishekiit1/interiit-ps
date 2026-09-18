@@ -59,12 +59,23 @@ def git_tool_function(state: InvestigationState) -> InvestigationState:
         )
         
         response = llm.invoke([HumanMessage(content=formatted_prompt)])
-        yaml_response = safe_load(response.content.replace('```yaml', '').replace('```', ''))
+        raw_content = response.content.replace('```yaml', '').replace('```', '').strip()
+        
+        try:
+            yaml_response = safe_load(raw_content)
+            if not isinstance(yaml_response, dict):
+                raise ValueError("Parsed YAML is not a dictionary")
+        except Exception:
+            # Fallback: assume we should run git tool
+            yaml_response = {"run_git_tool": True}
+            
         run_git_tool = yaml_response.get("run_git_tool", False)
+        print(f"    📦 Git tool decision: run={run_git_tool}")
         
         if run_git_tool:
             # Invoke the tool
             result = get_recent_git_changes.invoke({"repo_path": "."})
+            print(f"    📦 Git result: {result[:150]}...")
             
             # Append the tool's raw result directly to the evidence list
             state["evidence"] = [*state.get("evidence", []), result]
@@ -73,4 +84,8 @@ def git_tool_function(state: InvestigationState) -> InvestigationState:
             
         return state
     except Exception as error:
-        raise RuntimeError(f"Git Tool Error:\nReason: {error}") from error
+        # Gracefully handle failures — don't crash the pipeline
+        error_msg = f"Git Tool: Failed ({error}). Returning empty evidence."
+        print(f"    ⚠️ {error_msg}")
+        state["evidence"] = [*state.get("evidence", []), f"<untrusted_data>\n{error_msg}\n</untrusted_data>"]
+        return state

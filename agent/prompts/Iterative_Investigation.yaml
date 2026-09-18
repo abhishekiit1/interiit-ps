@@ -60,9 +60,6 @@ template: |
     - Updated hypothesis 2
     - Updated hypothesis 3
 
-    next_step: 
-    - an integer which was explained above.(0 to 15)
+    next_step: 5
 
-    confidence:
-    - a floating point number between 0 and 1. Don't go beyond two decimal places.
-
+    confidence: 0.75
