@@ -1,0 +1,79 @@
+summary: 'RCA generation failed: This request requires more credits, or fewer max_tokens.
+  You requested up to 512 tokens, but can only afford 426. To increase, visit https://openrouter.ai/workspaces/default/keys/622f6402c60dd987a75f582f6d569bae1de0621b0a6b5fac9005d0cc93b23b4e
+  and adjust the key''s daily limit'
+evidence_collected:
+- '<untrusted_data>
+
+  Labels: {''pod'': ''cartservice-5766c97c79-rr8xb''} | Value: 0.24470894130220486
+
+
+  </untrusted_data>'
+- '<untrusted_data>
+
+  Pod: adservice-7d967dfd5d-l6bxn | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: cartservice-5766c97c79-rr8xb | Phase: Running | Restarts: 22 | LastTermination:
+  Error (exit_code=137)
+
+  Pod: checkoutservice-7b9ff7f778-nk2fd | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: currencyservice-5848894c4d-chhv4 | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: emailservice-794bcfc956-t7bd5 | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: frontend-56455998f9-j82lp | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: loadgenerator-7d7c7bd9-6m2lp | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: loki-0 | Phase: Running | Restarts: 1 | LastTermination: Unknown (exit_code=255)
+
+  Pod: loki-promtail-gthdc | Phase: Running | Restarts: 1 | LastTermination: Unknown
+  (exit_code=255)
+
+  Pod: paymentservice-597bd87644-lkf8q | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: productcatalogservice-bb76fcc7d-dbrbq | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: prometheus-alertmanager-0 | Phase: Running | Restarts: 0
+
+  Pod: prometheus-kube-state-metrics-54dc6d7965-7slhx | Phase: Running | Restarts:
+  1 | LastTermination: Unknown (exit_code=255)
+
+  Pod: prometheus-prometheus-node-exporter-qpb2z | Phase: Running | Restarts: 1 |
+  LastTermination: Unknown (exit_code=255)
+
+  Pod: prometheus-prometheus-pushgateway-66b57b84dd-t2ddw | Phase: Running | Restarts:
+  1 | LastTermination: Unknown (exit_code=255)
+
+  Pod: prometheus-server-7bf8ffd497-8nct8 | Phase: Running | Restarts: 0
+
+  Pod: recommendationservice-59f88c664d-s5qff | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: redis-cart-6fdc7894b7-rq9sp | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+  Pod: shippingservice-67cb5f8584-r68lp | Phase: Running | Restarts: 1 | LastTermination:
+  Unknown (exit_code=255)
+
+
+  </untrusted_data>'
+- '<untrusted_data>
+
+  Loki Tool: Query failed (This request requires more credits, or fewer max_tokens.
+  You requested up to 512 tokens, but can only afford 426. To increase, visit https://openrouter.ai/workspaces/default/keys/622f6402c60dd987a75f582f6d569bae1de0621b0a6b5fac9005d0cc93b23b4e
+  and adjust the key''s daily limit). Returning empty evidence.
+
+  </untrusted_data>'
+- 'SYSTEM_NOTE: Iterative investigation failed (This request requires more credits,
+  or fewer max_tokens. You requested up to 512 tokens, but can only afford 426. To
+  increase, visit https://openrouter.ai/workspaces/default/keys/622f6402c60dd987a75f582f6d569bae1de0621b0a6b5fac9005d0cc93b23b4e
+  and adjust the key''s daily limit). Forcing summary.'
