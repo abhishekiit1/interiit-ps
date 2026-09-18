@@ -1,170 +1,104 @@
-<!-- <p align="center">
-<img src="/src/frontend/static/icons/Hipster_HeroLogoMaroon.svg" width="300" alt="Online Boutique" />
-</p> -->
-![Continuous Integration](https://github.com/GoogleCloudPlatform/microservices-demo/workflows/Continuous%20Integration%20-%20Main/Release/badge.svg)
+# LangGraph Automated RCA Agent
 
-**Online Boutique** is a cloud-first microservices demo application.  The application is a
-web-based e-commerce app where users can browse items, add them to the cart, and purchase them.
+An intelligent, autonomous Root Cause Analysis (RCA) agent powered by LangGraph, Kubernetes, and LLMs (Gemini/OpenRouter). This agent hooks into Prometheus AlertManager to automatically investigate production incidents, query logs and cluster state, and generate detailed root cause analyses.
 
-Google uses this application to demonstrate how developers can modernize enterprise applications using Google Cloud products, including: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine), [Cloud Service Mesh (CSM)](https://cloud.google.com/service-mesh), [gRPC](https://grpc.io/), [Cloud Operations](https://cloud.google.com/products/operations), [Spanner](https://cloud.google.com/spanner), [Memorystore](https://cloud.google.com/memorystore), [AlloyDB](https://cloud.google.com/alloydb), and [Gemini](https://ai.google.dev/). This application works on any Kubernetes cluster.
+This repository is built on top of the Google Cloud Online Boutique microservices demo.
 
-If you’re using this demo, please **★Star** this repository to show your interest!
+---
 
-**Note to Googlers:** Please fill out the form at [go/microservices-demo](http://go/microservices-demo).
+## 🏗️ Architecture
 
-## Architecture
+Our agent operates on a multi-agent swarm architecture using LangGraph, allowing for dynamic, iterative investigation of cluster alerts.
 
-**Online Boutique** is composed of 11 microservices written in different
-languages that talk to each other over gRPC.
+![Architecture Diagram](/images/graph_architecture.png)
 
-[![Architecture of
-microservices](/docs/img/architecture-diagram.png)](/docs/img/architecture-diagram.png)
+### Core Components:
+- **Supervisor Node**: The "Brain" of the operation. It receives the initial Prometheus alert, formulates hypotheses, and decides which specialized tool to call next using a bitmask (e.g., `0101` to call both Loki and Prometheus).
+- **Tool Proxy Node**: Acts as a router to dispatch the LLM's requests to the correct expert tool nodes.
+- **Expert Tool Nodes**: 
+  - `PrometheusToolNode`: Queries PromQL for metric anomalies.
+  - `LokiToolNode`: Queries LogQL for application logs.
+  - `K8sToolNode`: Directly interacts with the Kubernetes API to fetch pod states (e.g., `OOMKilled`, `CrashLoopBackOff`).
+  - `GitToolNode`: Checks recent commit history for bad deployments.
+- **Summary Eval Node**: The final node that synthesizes all gathered evidence into a comprehensive, human-readable Root Cause Analysis report.
 
-Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
+---
 
-| Service                                              | Language      | Description                                                                                                                       |
-| ---------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [frontend](/src/frontend)                           | Go            | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
-| [cartservice](/src/cartservice)                     | C#            | Stores the items in the user's shopping cart in Redis and retrieves it.                                                           |
-| [productcatalogservice](/src/productcatalogservice) | Go            | Provides the list of products from a JSON file and ability to search products and get individual products.                        |
-| [currencyservice](/src/currencyservice)             | Node.js       | Converts one money amount to another currency. Uses real values fetched from European Central Bank. It's the highest QPS service. |
-| [paymentservice](/src/paymentservice)               | Node.js       | Charges the given credit card info (mock) with the given amount and returns a transaction ID.                                     |
-| [shippingservice](/src/shippingservice)             | Go            | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock)                                 |
-| [emailservice](/src/emailservice)                   | Python        | Sends users an order confirmation email (mock).                                                                                   |
-| [checkoutservice](/src/checkoutservice)             | Go            | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification.                            |
-| [recommendationservice](/src/recommendationservice) | Python        | Recommends other products based on what's given in the cart.                                                                      |
-| [adservice](/src/adservice)                         | Java          | Provides text ads based on given context words.                                                                                   |
-| [loadgenerator](/src/loadgenerator)                 | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend.                                              |
+## 🚀 Deploy
 
-## Screenshots
+### 1. Setup Environment Variables
+Create a `.env` file in the root directory and add your API keys. We use a multi-provider fallback system:
+```env
+GOOGLE_API_KEY="your-gemini-key"
+OPENROUTER_API_KEY="your-openrouter-key"
+OPENROUTER_API_KEY_ALT="your-openrouter-fallback-key"
+```
 
-| Home Page                                                                                                         | Checkout Screen                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| [![Screenshot of store homepage](/docs/img/online-boutique-frontend-1.png)](/docs/img/online-boutique-frontend-1.png) | [![Screenshot of checkout screen](/docs/img/online-boutique-frontend-2.png)](/docs/img/online-boutique-frontend-2.png) |
+### 2. Clone the Repository
+```bash
+git clone <link>
+cd interiit-ps
+```
 
-## Quickstart (GKE)
+### 3. Start the Cluster
+The startup script provisions a `kind` cluster, installs Loki, Prometheus, and the microservices.
+- **For Mac/Windows (Docker Desktop)**:
+  ```bash
+  ./start_cluster.sh
+  ```
+- **For Linux**:
+  ```bash
+  ./start_cluster_linux.sh
+  ```
 
-1. Ensure you have the following requirements:
-   - [Google Cloud project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
-   - Shell environment with `gcloud`, `git`, and `kubectl`.
+### 4. Start the Agent Listener
+Run the FastAPI webhook listener to start accepting alerts from Prometheus:
+```bash
+source venv/bin/activate
+python3 agent/core/listener.py
+```
 
-2. Clone the latest major version.
+### 5. Inject Chaos
+Trigger an alert by injecting chaos into the cluster:
+```bash
+kubectl apply -f chaos\ injection/cpu-stress.yaml
+```
 
-   ```sh
-   git clone --depth 1 --branch v0 https://github.com/GoogleCloudPlatform/microservices-demo.git
-   cd microservices-demo/
-   ```
+---
 
-   The `--depth 1` argument skips downloading git history.
+## 🛠️ Problems We Faced & How We Fixed Them
 
-3. Set the Google Cloud project and region and ensure the Google Kubernetes Engine API is enabled.
+Building an autonomous agent that operates in a real Kubernetes environment presented several complex challenges. Here are the top 4 challenges we faced and our engineering solutions:
 
-   ```sh
-   export PROJECT_ID=<PROJECT_ID>
-   export REGION=us-central1
-   gcloud services enable container.googleapis.com \
-     --project=${PROJECT_ID}
-   ```
+### 1. Exhaustion of API Quotas & Nested Retry Loops
+* **The Problem**: The LangChain SDK's internal retry mechanisms, combined with our custom wrapper's exponential backoff, created massive, invisible delays (hanging for 4+ minutes per request) when free API quotas (Gemini & OpenRouter) were depleted. The agent appeared to get "lost" and would block incoming alerts indefinitely.
+* **The Solution**: We engineered a custom "Fail Fast" mechanism. We explicitly disabled internal SDK retries (`max_retries=0`) and reduced our wrapper's sleep cycles. The agent now gracefully falls back through multiple LLM providers or exits cleanly within seconds, releasing the concurrency lock for the next alert.
 
-   Substitute `<PROJECT_ID>` with the ID of your Google Cloud project.
+### 2. Multi-Tool Execution & Graph Routing
+* **The Problem**: The LangGraph architecture initially dropped subsequent tool calls because it only processed the highest-order bit of the `next_node` bitmask, preventing the agent from combining tools (e.g., executing Loki + K8s in one turn).
+* **The Solution**: We implemented a bitwise clearing algorithm (`bit_to_run = next_node & -next_node`) in the Supervisor routing logic. The graph now sequentially pops and executes tools, routing back to the `ToolProxyNode` until the bitmask is completely cleared (`next_node == 0`).
 
-4. Create a GKE cluster and get the credentials for it.
+### 3. Brittle YAML Parsing from LLMs
+* **The Problem**: LLMs frequently returned improperly fenced or malformed YAML responses (e.g., returning string scalars instead of dictionaries). This caused `PyYAML` to parse them incorrectly, leading to fatal `'str' object has no attribute 'get'` exceptions across all Tool Nodes.
+* **The Solution**: We implemented defensive parsing boundaries and fallbacks (`isinstance(yaml_response, dict)`) across the entire pipeline. If standard parsing fails, the agent intelligently falls back to Regex (`re.search`) to extract critical parameters (like `next_step` and queries) safely.
 
-   ```sh
-   gcloud container clusters create-auto online-boutique \
-     --project=${PROJECT_ID} --region=${REGION} \
-     --labels dev-tutorial=online-boutique
-   ```
+### 4. Cross-OS Docker Networking (Linux vs Mac)
+* **The Problem**: The AlertManager webhook relies on `host.docker.internal` to ping the local Python listener on port 3000. This works natively on Mac, but fails entirely on Linux `kind` clusters.
+* **The Solution**: We engineered a dynamic cluster setup script (`start_cluster_linux.sh`) that automatically queries Docker for the `kind` network gateway IP and patches `prometheus-values.yaml` on the fly using `sed`.
 
-   Creating the cluster may take a few minutes.
+---
 
-5. Deploy Online Boutique to the cluster.
+## 📊 Results
 
-   ```sh
-   kubectl apply -f ./release/kubernetes-manifests.yaml
-   ```
+We successfully stress-tested the agent pipeline. We were able to generate 2 RCAs (one successful and one failed due to strict token/credit limits on the LLM APIs). 
 
-6. Wait for the pods to be ready.
+When successful, the agent accurately identifies the failing pod (e.g., `cartservice` OOMKilled) and returns a structured YAML RCA report detailing the root cause and confidence level.
 
-   ```sh
-   kubectl get pods
-   ```
+![RCA Screenshot](/images/rca_scrnsht.png)
 
-   After a few minutes, you should see the Pods in a `Running` state:
+---
 
-   ```
-   NAME                                     READY   STATUS    RESTARTS   AGE
-   adservice-76bdd69666-ckc5j               1/1     Running   0          2m58s
-   cartservice-66d497c6b7-dp5jr             1/1     Running   0          2m59s
-   checkoutservice-666c784bd6-4jd22         1/1     Running   0          3m1s
-   currencyservice-5d5d496984-4jmd7         1/1     Running   0          2m59s
-   emailservice-667457d9d6-75jcq            1/1     Running   0          3m2s
-   frontend-6b8d69b9fb-wjqdg                1/1     Running   0          3m1s
-   loadgenerator-665b5cd444-gwqdq           1/1     Running   0          3m
-   paymentservice-68596d6dd6-bf6bv          1/1     Running   0          3m
-   productcatalogservice-557d474574-888kr   1/1     Running   0          3m
-   recommendationservice-69c56b74d4-7z8r5   1/1     Running   0          3m1s
-   redis-cart-5f59546cdd-5jnqf              1/1     Running   0          2m58s
-   shippingservice-6ccc89f8fd-v686r         1/1     Running   0          2m58s
-   ```
+## 🚧 Remaining Work
 
-7. Access the web frontend in a browser using the frontend's external IP.
-
-   ```sh
-   kubectl get service frontend-external | awk '{print $4}'
-   ```
-
-   Visit `http://EXTERNAL_IP` in a web browser to access your instance of Online Boutique.
-
-8. Congrats! You've deployed the default Online Boutique. To deploy a different variation of Online Boutique (e.g., with Google Cloud Operations tracing, Istio, etc.), see [Deploy Online Boutique variations with Kustomize](#deploy-online-boutique-variations-with-kustomize).
-
-9. Once you are done with it, delete the GKE cluster.
-
-   ```sh
-   gcloud container clusters delete online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
-   ```
-
-   Deleting the cluster may take a few minutes.
-
-## Additional deployment options
-
-- **Terraform**: [See these instructions](/terraform) to learn how to deploy Online Boutique using [Terraform](https://www.terraform.io/intro).
-- **Istio / Cloud Service Mesh**: [See these instructions](/kustomize/components/service-mesh-istio/README.md) to deploy Online Boutique alongside an Istio-backed service mesh.
-- **Non-GKE clusters (Minikube, Kind, etc)**: See the [Development guide](/docs/development-guide.md) to learn how you can deploy Online Boutique on non-GKE clusters.
-- **AI assistant using Gemini**: [See these instructions](/kustomize/components/shopping-assistant/README.md) to deploy a Gemini-powered AI assistant that suggests products to purchase based on an image.
-- **And more**: The [`/kustomize` directory](/kustomize) contains instructions for customizing the deployment of Online Boutique with other variations.
-
-## Documentation
-
-- [Development](/docs/development-guide.md) to learn how to run and develop this app locally.
-
-## Demos featuring Online Boutique
-
-- [Security hardening of the OnlineBoutique sample apps with the Docker Hardened Images (DHI)](https://medium.com/google-cloud/security-hardening-of-the-onlineboutique-sample-apps-with-docker-hardened-images-dhi-ca1fad348343)
-- [alpine, distroless or scratch?](https://medium.com/google-cloud/alpine-distroless-or-scratch-caac35250e0b)
-- [Platform Engineering in action: Deploy the Online Boutique sample apps with Score and Humanitec](https://medium.com/p/d99101001e69)
-- [The new Kubernetes Gateway API with Istio and Anthos Service Mesh (ASM)](https://medium.com/p/9d64c7009cd)
-- [Use Azure Redis Cache with the Online Boutique sample on AKS](https://medium.com/p/981bd98b53f8)
-- [Sail Sharp, 8 tips to optimize and secure your .NET containers for Kubernetes](https://medium.com/p/c68ba253844a)
-- [Deploy multi-region application with Anthos and Google cloud Spanner](https://medium.com/google-cloud/a2ea3493ed0)
-- [Use Google Cloud Memorystore (Redis) with the Online Boutique sample on GKE](https://medium.com/p/82f7879a900d)
-- [Use Helm to simplify the deployment of Online Boutique, with a Service Mesh, GitOps, and more!](https://medium.com/p/246119e46d53)
-- [How to reduce microservices complexity with Apigee and Anthos Service Mesh](https://cloud.google.com/blog/products/application-modernization/api-management-and-service-mesh-go-together)
-- [gRPC health probes with Kubernetes 1.24+](https://medium.com/p/b5bd26253a4c)
-- [Use Google Cloud Spanner with the Online Boutique sample](https://medium.com/p/f7248e077339)
-- [Seamlessly encrypt traffic from any apps in your Mesh to Memorystore (redis)](https://medium.com/google-cloud/64b71969318d)
-- [Strengthen your app's security with Cloud Service Mesh and Anthos Config Management](https://cloud.google.com/service-mesh/docs/strengthen-app-security)
-- [From edge to mesh: Exposing service mesh applications through GKE Ingress](https://cloud.google.com/architecture/exposing-service-mesh-apps-through-gke-ingress)
-- [Take the first step toward SRE with Cloud Operations Sandbox](https://cloud.google.com/blog/products/operations/on-the-road-to-sre-with-cloud-operations-sandbox)
-- [Deploying the Online Boutique sample application on Cloud Service Mesh](https://cloud.google.com/service-mesh/docs/onlineboutique-install-kpt)
-- [Anthos Service Mesh Workshop: Lab Guide](https://codelabs.developers.google.com/codelabs/anthos-service-mesh-workshop)
-- [KubeCon EU 2019 - Reinventing Networking: A Deep Dive into Istio's Multicluster Gateways - Steve Dake, Independent](https://youtu.be/-t2BfT59zJA?t=982)
-- Google Cloud Next'18 SF
-  - [Day 1 Keynote](https://youtu.be/vJ9OaAqfxo4?t=2416) showing GKE On-Prem
-  - [Day 3 Keynote](https://youtu.be/JQPOPV_VH5w?t=815) showing Stackdriver
-    APM (Tracing, Code Search, Profiler, Google Cloud Build)
-  - [Introduction to Service Management with Istio](https://www.youtube.com/watch?v=wCJrdKdD6UM&feature=youtu.be&t=586)
-- [Google Cloud Next'18 London – Keynote](https://youtu.be/nIq2pkNcfEI?t=3071)
-  showing Stackdriver Incident Response Management
-- [Microservices demo showcasing Go Micro](https://github.com/go-micro/demo)
+- **Refine and Optimize Tools**: Currently, all tools are not always able to execute optimally due to hitting the rate limits of free-tier APIs. The log and metric payloads can be extremely token-heavy.
+- **Token Compression**: We need to implement intelligent summarization within the Python tool nodes (e.g., truncating logs, stripping boilerplate JSON) *before* passing the evidence back to the LLM to stay within the 512/1024 token limits of free keys.
