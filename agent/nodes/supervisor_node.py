@@ -1,5 +1,6 @@
+import os
 from core.state import InvestigationState
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import load_prompt
 from core.llm_init import llm
 from yaml import safe_load
@@ -11,17 +12,57 @@ def initial_investigation(state: InvestigationState) -> InvestigationState:
     we need to generate one by observing the alert message only. Once the hypotheses is generated,
     we need to call a suitable tool or tools as per our requirement. 
     """
+    print(f"\n{'─'*50}")
+    print(f"  📋 [InitialInvestigation] Starting...")
+    print(f"  📋 Alert: {state.get('incident_description', '')[:100]}")
+    
     try:
-        initial_prompt = [SystemMessage(load_prompt("../prompts/Investigation_Begin.yaml"))]
-        initial_response = llm.invoke(initial_prompt.format(alert= state["incident_description"]))
-        yaml_response = safe_load(initial_response.content)
-        state["hypotheses"] = yaml_response["hypotheses"]
-        state["next_node"] = int(yaml_response["next_step"])
+        prompt_template = load_prompt(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../prompts/Investigation_Begin.yaml"))
+        # In a real system, incident_timestamp would be parsed from the alert. 
+        # For our swarm, we'll initialize it here if it's empty.
+        import datetime
+        if not state.get("incident_timestamp"):
+            state["incident_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            
+        formatted_prompt = prompt_template.format(alert=state.get("incident_description", ""))
+        initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
+        
+        raw_content = initial_response.content.replace('```yaml', '').replace('```', '').strip()
+        print(f"  📋 LLM raw response:\n{raw_content[:300]}")
+        
+        try:
+            yaml_response = safe_load(raw_content)
+        except Exception as yaml_err:
+            print(f"  ⚠️ YAML parse failed: {yaml_err}")
+            import re
+            yaml_response = {}
+            ns_match = re.search(r'next_step:.*?(\d+)', raw_content, re.DOTALL)
+            yaml_response["next_step"] = int(ns_match.group(1)) if ns_match else 4  # Default to K8s
+            yaml_response["hypotheses"] = [f"Auto-generated: Investigating alert - {state.get('incident_description', '')[:100]}"]
+            
+        state["hypotheses"] = yaml_response.get("hypotheses", [])
+        
+        # Handle next_step being returned as a list (e.g., [1] instead of 1)
+        ns = yaml_response.get("next_step", 0)
+        if isinstance(ns, list):
+            ns = ns[0] if len(ns) > 0 else 0
+        state["next_node"] = int(ns)
+        
+        state["suspect_components"] = [] # Initialize empty for the first step
+        
+        print(f"  📋 Hypotheses: {state['hypotheses']}")
+        print(f"  📋 Next tool bitmask: {state['next_node']} (binary: {bin(state['next_node'])})")
+        print(f"{'─'*50}")
+        
         return state
     except Exception as error:
+        print(f"  ❌ [InitialInvestigation] FAILED: {error}")
+        import traceback
+        traceback.print_exc()
         raise RuntimeError(
             f'Initial RCA investigation failed:\nReason: {error}.'
         )
+
 # iterative investigation function -- making conclusions from given logs/evidence
 def iterative_investigation(state: InvestigationState) -> InvestigationState:
     """
@@ -30,21 +71,76 @@ def iterative_investigation(state: InvestigationState) -> InvestigationState:
     next tool call (may not call next tool if confidence is high), along with the confidence score for 
     the solution.
     """
+    # Safeguard against infinite loops
+    state["iteration_count"] = state.get("iteration_count", 0) + 1
+    
+    print(f"\n{'─'*50}")
+    print(f"  🔄 [IterativeInvestigation] Iteration {state['iteration_count']}/4")
+    print(f"  🔄 Evidence count: {len(state.get('evidence', []))}")
+    print(f"  🔄 Current hypotheses: {state.get('hypotheses', [])}")
+    
+    if state["iteration_count"] >= 4:
+        print(f"  ⏹️ Max iterations reached, forcing summary generation.")
+        state["next_node"] = 0
+        state["evidence"] = [*state.get("evidence", []), "SYSTEM_NOTE: Max iterations reached (4). Forcing summary generation."]
+        return state
+
     try:
-        initial_prompt = [SystemMessage(load_prompt("../prompts/Iterative_Investigation.yaml"))]
-        initail_response = llm.invoke(
-            initial_prompt.format(hypotheses=state["hypotheses"],
-            evidence=state["evidence"])
+        prompt_template = load_prompt(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../prompts/Iterative_Investigation.yaml"))
+        formatted_prompt = prompt_template.format(
+            incident_description=state.get("incident_description", ""),
+            incident_timestamp=state.get("incident_timestamp", ""),
+            suspect_components=state.get("suspect_components", []),
+            hypotheses=state.get("hypotheses", []),
+            evidence=state.get("evidence", [])
         )
-        yaml_response = safe_load(initail_response)
-        state["hypotheses"] = yaml_response["hypotheses"]
-        state["next_node"] = int(yaml_response["next_step"])
-        state["confidence"] = float(yaml_response["confidence"])
+        initial_response = llm.invoke([HumanMessage(content=formatted_prompt)])
+        
+        raw_content = initial_response.content.replace('```yaml', '').replace('```', '').strip()
+        print(f"  🔄 LLM raw response:\n{raw_content[:300]}")
+        
+        try:
+            yaml_response = safe_load(raw_content)
+        except Exception as yaml_err:
+            print(f"  ⚠️ YAML parse failed: {yaml_err}")
+            import re
+            yaml_response = {}
+            ns_match = re.search(r'next_step:.*?(\d+)', raw_content, re.DOTALL)
+            yaml_response["next_step"] = int(ns_match.group(1)) if ns_match else 0
+            conf_match = re.search(r'confidence:.*?([\d.]+)', raw_content, re.DOTALL)
+            yaml_response["confidence"] = float(conf_match.group(1)) if conf_match else 0.5
+            yaml_response["suspect_components"] = state.get("suspect_components", [])
+            yaml_response["hypotheses"] = state.get("hypotheses", [])
+
+        state["suspect_components"] = yaml_response.get("suspect_components", state.get("suspect_components", []))
+        state["hypotheses"] = yaml_response.get("hypotheses", state.get("hypotheses", []))
+        
+        ns = yaml_response.get("next_step", 0)
+        if isinstance(ns, list):
+            ns = ns[0] if len(ns) > 0 else 0
+        state["next_node"] = int(ns)
+        
+        conf = yaml_response.get("confidence", 0.0)
+        if isinstance(conf, list):
+            conf = conf[0] if len(conf) > 0 else 0.0
+        state["confidence"] = float(conf)
+
+        print(f"  🔄 Updated hypotheses: {state['hypotheses']}")
+        print(f"  🔄 Suspect components: {state['suspect_components']}")
+        print(f"  🔄 Confidence: {state['confidence']}")
+        print(f"  🔄 Next tool bitmask: {state['next_node']} (binary: {bin(state['next_node'])})")
+        print(f"{'─'*50}")
+
         return state
     except Exception as error:
-        raise RuntimeError(
-            f'Iterative Investigation failure:\nReason: {error}.\n'
-        )
+        print(f"  ❌ [IterativeInvestigation] FAILED: {error}")
+        import traceback
+        traceback.print_exc()
+        # Don't crash - force summary with what we have
+        state["next_node"] = 0
+        state["evidence"] = [*state.get("evidence", []), f"SYSTEM_NOTE: Iterative investigation failed ({error}). Forcing summary."]
+        return state
+
 # supervisor node function
 def supervisor_function(state: InvestigationState) -> InvestigationState:
     """
@@ -54,15 +150,9 @@ def supervisor_function(state: InvestigationState) -> InvestigationState:
     Args:
         alert: generated by alert manager of prometheus 
     """
-    steps = len(state["investigation_steps"])
-    next_step = state["next_node"]
-    if steps == 0:
-        #initial investigation
+    if not state.get("hypotheses"):
+        # initial investigation
         return initial_investigation(state)
-    elif next_step != 0:
-        #tools need to be called
-        return state
     else:
-        #tools are called need to reiterate on the evidence collected
+        # tools are called need to reiterate on the evidence collected
         return iterative_investigation(state)
-

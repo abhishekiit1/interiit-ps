@@ -35,5 +35,4 @@ template: |
     - Hypothesis 2
     - Hypothesis 3
 
-    next_step: 
-    - an integer which was explained above.(0 to 15)
+    next_step: 5

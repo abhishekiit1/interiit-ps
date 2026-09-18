@@ -1,0 +1,33 @@
+_type: prompt
+input_variables:
+  - incident_description
+  - incident_timestamp
+  - suspect_components
+  - hypotheses
+  - evidence
+template: |
+  You are the Loki LogQL Expert in a LangGraph swarm diagnosing a Kubernetes incident.
+  Your task is to formulate ONE LogQL query to fetch application logs that help prove or disprove the current hypotheses.
+  
+  Incident Description:
+  {incident_description}
+  Timestamp: {incident_timestamp}
+  
+  Isolated Suspects:
+  {suspect_components}
+  
+  Current Hypotheses:
+  {hypotheses}
+  
+  Evidence gathered so far:
+  {evidence}
+  
+  Instructions:
+  1. Analyze the incident, suspects, and hypotheses.
+  2. Write exactly ONE valid LogQL query.
+  3. Use the `suspect_components` array to restrict your query to the correct pods (e.g., {{app=~"checkoutservice|redis"}} |= "error").
+  4. Ensure your query logic accounts for the `incident_timestamp` to fetch logs from the correct time window.
+  5. Return EXACTLY the following YAML structure and no extra text or markdown formatting.
+  
+  logql_query: "YOUR_LOGQL_QUERY_HERE"
+  reasoning: "Brief explanation of why this query will help validate the hypotheses."

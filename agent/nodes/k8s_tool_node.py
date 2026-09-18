@@ -1,10 +1,111 @@
-# agent/core/tools.py
-import requests
+import os
+import time
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import load_prompt
+from core.llm_init import llm
+from core.state import InvestigationState
+from yaml import safe_load
 from langchain_core.tools import tool
-
-
 from kubernetes import client, config
 
-import subprocess
-import os
-from langchain_core.tools import tool
+# Load the kubeconfig so the agent has the exact same access your terminal does
+config.load_kube_config()
+v1 = client.CoreV1Api()
+
+@tool
+def get_pod_status(namespace: str = "default", app_label: str = "") -> str:
+    """
+    Fetches the current status and restart counts of Kubernetes pods.
+    Use this tool to investigate if containers are crash-looping or failing to start.
+    
+    Args:
+        namespace: The Kubernetes namespace to query (usually "default").
+        app_label: Optional label to filter pods by app (e.g., "checkoutservice"). Use for hierarchical drill-downs.
+    """
+    try:
+        if app_label:
+            pods = v1.list_namespaced_pod(namespace=namespace, label_selector=f"app={app_label}")
+        else:
+            pods = v1.list_namespaced_pod(namespace=namespace)
+            
+        formatted_output = ""
+        
+        for pod in pods.items:
+            name = pod.metadata.name
+            phase = pod.status.phase
+            
+            # Dig into the container statuses to find the actual restart count
+            restarts = 0
+            last_state_info = ""
+            if pod.status.container_statuses:
+                restarts = sum(c.restart_count for c in pod.status.container_statuses)
+                # Also capture the last termination reason
+                for c in pod.status.container_statuses:
+                    if c.last_state and c.last_state.terminated:
+                        reason = c.last_state.terminated.reason or "Unknown"
+                        exit_code = c.last_state.terminated.exit_code
+                        last_state_info = f" | LastTermination: {reason} (exit_code={exit_code})"
+                
+            formatted_output += f"Pod: {name} | Phase: {phase} | Restarts: {restarts}{last_state_info}\n"
+            
+        # Wrap in sandboxing tags to prevent prompt injection from pod names
+        return f"<untrusted_data>\n{formatted_output}\n</untrusted_data>"
+        
+    except Exception as e:
+        return f"Kubernetes query failed: {str(e)}"
+
+
+def k8s_tool_function(state: InvestigationState) -> InvestigationState:
+    """
+    Kubernetes Expert Node.
+    Analyzes the incident and decides whether to fetch all pod statuses or drill down into a specific suspect app.
+    """
+    try:
+        prompt_template = load_prompt(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../prompts/Kubernetes_Query.yaml"))
+        formatted_prompt = prompt_template.format(
+            incident_description=state.get("incident_description", ""),
+            suspect_components=state.get("suspect_components", []),
+            hypotheses=state.get("hypotheses", []),
+            evidence=state.get("evidence", [])
+        )
+        
+        response = llm.invoke([HumanMessage(content=formatted_prompt)])
+        raw_content = response.content.replace('```yaml', '').replace('```', '').strip()
+        
+        try:
+            yaml_response = safe_load(raw_content)
+            if not isinstance(yaml_response, dict):
+                raise ValueError("Parsed YAML is not a dictionary")
+        except Exception:
+            # Fallback: extract app_label from raw text
+            import re
+            match = re.search(r'app_label:\s*["\']?(.+?)["\']?\s*$', raw_content, re.MULTILINE)
+            yaml_response = {"app_label": match.group(1).strip() if match else ""}
+        
+        app_label = yaml_response.get("app_label", "").strip()
+        print(f"    🐳 K8s query: app_label='{app_label}'")
+        
+        last_error = None
+
+        for attempt in range(1, 4):
+            try:
+                # Invoke the tool with the app_label parameter
+                result = get_pod_status.invoke({"namespace": "default", "app_label": app_label})
+
+                if result.startswith("Kubernetes query failed:"):
+                    raise RuntimeError(result)
+
+                print(f"    🐳 K8s result: {result[:150]}...")
+                # Append the tool's raw result directly to the evidence list
+                state["evidence"] = [*state.get("evidence", []), result]
+                return state
+            except Exception as error:
+                last_error = error
+        
+        raise RuntimeError(f"Kubernetes query failed after 3 attempts: {last_error}")
+    except Exception as error:
+        # Gracefully handle failures — don't crash the pipeline
+        error_msg = f"K8s Tool: Query failed ({error}). Returning empty evidence."
+        print(f"    ⚠️ {error_msg}")
+        state["evidence"] = [*state.get("evidence", []), f"<untrusted_data>\n{error_msg}\n</untrusted_data>"]
+        return state

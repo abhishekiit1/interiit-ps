@@ -10,6 +10,6 @@ spec:
       app: checkoutservice
   stressors:
     memory:
-      workers: 4
-      size: '1GB'
-  duration: '5m'
+      workers: 8
+      size: '2GB'
+  duration: '30m'
