@@ -39,7 +39,7 @@ OPENROUTER_API_KEY_ALT="your-openrouter-fallback-key"
 git clone https://github.com/abhishekiit1/interiit-ps
 ```
 
-### 3. Start the Cluster
+### 3. Start the Cluster.
 The startup script provisions a `kind` cluster, installs Loki, Prometheus, and the microservices.
 - **For Mac/Windows (Docker Desktop)**:
   ```bash
