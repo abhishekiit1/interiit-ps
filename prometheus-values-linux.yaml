@@ -1,0 +1,77 @@
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'pod']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'agent-webhook'
+    receivers:
+    - name: 'agent-webhook'
+      webhook_configs:
+      # fc00:f853:ccd:e793::1 allows the K8s cluster to reach your MacBook's localhost
+      - url: 'http://fc00:f853:ccd:e793::1:3000/alert'
+        send_resolved: true
+
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: agent_triggers
+        rules:
+          - alert: PodCrashLooping
+            expr: kube_pod_container_status_restarts_total > 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is repeatedly restarting."
+
+          - alert: HighErrorRate
+            expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (app) > 5
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High 5xx error rate on {{ $labels.app }}"
+              description: "App {{ $labels.app }} is throwing high 5xx errors."
+
+          - alert: HighLatency
+            expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, app)) > 2
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High latency on {{ $labels.app }}"
+              description: "App {{ $labels.app }} 99th percentile latency is above 2 seconds."
+
+          - alert: HighMemoryUsage
+            expr: (container_memory_working_set_bytes{container!="", namespace="default"} / container_spec_memory_limit_bytes{container!="", namespace="default"} * 100 > 90) and container_spec_memory_limit_bytes{container!="", namespace="default"} > 0
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High Memory usage on {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} is at {{ $value }}% memory usage."
+
+          - alert: CPUThrottling
+            expr: rate(container_cpu_cfs_throttled_periods_total[5m]) / rate(container_cpu_cfs_periods_total[5m]) * 100 > 25
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "CPU throttling on {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} is being heavily CPU throttled."
+
+          - alert: PodNotReady
+            expr: kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} > 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} is stuck"
+              description: "Pod {{ $labels.pod }} is stuck in {{ $labels.phase }} phase (e.g. ImagePullBackOff)."
