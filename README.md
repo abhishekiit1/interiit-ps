@@ -6,7 +6,7 @@ This repository is built on top of the Google Cloud Online Boutique microservice
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 Our agent operates on a multi-agent swarm architecture using LangGraph, allowing for dynamic, iterative investigation of cluster alerts.
 
@@ -24,7 +24,7 @@ Our agent operates on a multi-agent swarm architecture using LangGraph, allowing
 
 ---
 
-## 🚀 Deploy
+##  Deploy
 
 ### 1. Setup Environment Variables
 Create a `.env` file in the root directory and add your API keys. We use a multi-provider fallback system:
@@ -36,8 +36,7 @@ OPENROUTER_API_KEY_ALT="your-openrouter-fallback-key"
 
 ### 2. Clone the Repository
 ```bash
-git clone <link>
-cd interiit-ps
+git clone https://github.com/abhishekiit1/interiit-ps
 ```
 
 ### 3. Start the Cluster
@@ -66,7 +65,7 @@ kubectl apply -f chaos\ injection/cpu-stress.yaml
 
 ---
 
-## 🛠️ Problems We Faced & How We Fixed Them
+##  Problems We Faced & How We Fixed Them
 
 Building an autonomous agent that operates in a real Kubernetes environment presented several complex challenges. Here are the top 4 challenges we faced and our engineering solutions:
 
@@ -88,7 +87,7 @@ Building an autonomous agent that operates in a real Kubernetes environment pres
 
 ---
 
-## 📊 Results
+##  Results
 
 We successfully stress-tested the agent pipeline. We were able to generate 2 RCAs (one successful and one failed due to strict token/credit limits on the LLM APIs). 
 
@@ -98,7 +97,7 @@ When successful, the agent accurately identifies the failing pod (e.g., `cartser
 
 ---
 
-## 🚧 Remaining Work
+##  Remaining Work
 
 - **Refine and Optimize Tools**: Currently, all tools are not always able to execute optimally due to hitting the rate limits of free-tier APIs. The log and metric payloads can be extremely token-heavy.
 - **Token Compression**: We need to implement intelligent summarization within the Python tool nodes (e.g., truncating logs, stripping boilerplate JSON) *before* passing the evidence back to the LLM to stay within the 512/1024 token limits of free keys.
