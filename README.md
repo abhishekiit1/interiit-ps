@@ -43,7 +43,7 @@ git clone https://github.com/abhishekiit1/interiit-ps
 The startup script provisions a `kind` cluster, installs Loki, Prometheus, and the microservices.
 - **For Mac/Windows (Docker Desktop)**:
   ```bash
-  ./start_cluster.sh
+  ./start_cluster_mac_or_windows.sh
   ```
 - **For Linux**:
   ```bash
@@ -51,6 +51,14 @@ The startup script provisions a `kind` cluster, installs Loki, Prometheus, and t
   ```
 
 ### 4. Start the Agent Listener
+First create a virtual environment
+```bash
+python -m venv venv
+```
+Then install the required libraries for python
+```bash
+pip install -r requirements.txt
+```
 Run the FastAPI webhook listener to start accepting alerts from Prometheus:
 ```bash
 source venv/bin/activate
